@@ -1,4 +1,3 @@
-# python QHtest.py /home/ywz/database/aftercut512/test/
 import torch
 import argparse
 import kornia
@@ -38,15 +37,17 @@ def tensors_to_gif(a, b, name):
 @torch.no_grad()
 def main(args):
     if args.resume !="":
-        model = HomographyModel.load_from_checkpoint(args.resume)
+        model = HomographyModel()
+        model_old = torch.load(args.resume, map_location=lambda storage, loc: storage)
+        model.load_state_dict(model_old['state_dict'])
+        print(args.resume)
+        print("model loaded.")
     else:
-        # model_dir = 'lightning_logs/version*'
-        # model_dir_list = sorted(glob.glob(model_dir))
-        # model_dir = model_dir_list[-1]
-        # model_path = osp.join(model_dir, "checkpoints", "*.ckpt")
-        # model_path_list = sorted(glob.glob(model_path))
-        model_path_list = sorted(glob.glob("*.ckpt"))
-        print(model_path_list)
+        model_dir = 'HESIC_logs/version*'
+        model_dir_list = sorted(glob.glob(model_dir))
+        model_dir = model_dir_list[-1]
+        model_path = osp.join(model_dir, "checkpoints", "*.ckpt")
+        model_path_list = sorted(glob.glob(model_path))
         if len(model_path_list) > 0:
             model_path = model_path_list[-1]
             print(model_path)
@@ -59,9 +60,7 @@ def main(args):
             print(model_path)
             print("model loaded.")
         else:
-            # raise ValueError(f'No load model!')  #raise Error
-            print("No load model!")
-            model = HomographyModel()  # test专用，内部重新定义精简版的类
+            raise ValueError(f'No load model!')  #raise Error
 
     model.eval()  #不训练
 
@@ -88,13 +87,11 @@ def main(args):
         corners = corners.unsqueeze(0)
 
         corners = corners - corners[:, 0].view(-1, 1, 2)
-
         delta_hat = model(patch_a, patch_b)
         corners_hat = corners + delta_hat
         #获取h
         h = kornia.get_perspective_transform(corners, corners_hat)
         h_inv = torch.inverse(h)
-
 
         patch_b_hat = kornia.warp_perspective(img_a, h_inv, (patch_a.shape[-2],patch_a.shape[-1]))  #128 最初设置 #注意，用img_a / patch_a
         img_b_hat = kornia.warp_perspective(img_a, h_inv, (img_a.shape[-2],img_a.shape[-1]))

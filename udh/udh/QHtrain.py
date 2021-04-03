@@ -55,7 +55,7 @@ def main(args):
 
             model_path = model_path_list[-1]
             hmodel = HomographyModel.load_from_checkpoint(model_path)
-            best = hmodel['loss']  # QH：不确定
+            best = hmodel['loss']
             print(model_path)
             print("model loaded.")
         except:
@@ -113,7 +113,7 @@ def main(args):
                 vali_patch_b = vali_patch_b.to(device)
                 vali_corners = vali_corners.to(device)
                 vali_delta = hmodel.model(vali_patch_a, vali_patch_b).to(device)
-                vali_loss = photometric_loss(vali_delta, vali_img_a, vali_patch_b, vali_corners)  # 问题出在这里！ 换掉patch_b
+                vali_loss = photometric_loss(vali_delta, vali_img_a, vali_patch_b, vali_corners)
                 vali_total_loss.append({"vali_loss": vali_loss})
 
             avg_loss = torch.stack([x["vali_loss"] for x in vali_total_loss]).mean()
