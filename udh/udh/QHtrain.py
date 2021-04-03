@@ -25,94 +25,114 @@ class HomographyModel(nn.Module):
 def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
     torch.save(state, filename)
     if is_best:
-        shutil.copyfile(state, 'checkpoint_best_loss.pth.tar')
+        shutil.copyfile(filename, 'checkpoint_best_loss.pth.tar')
 
 
 def main(args):
     # if args.resume is not "":
     #     model = HomographyModel.load_from_checkpoint(args.resume)
     if args.resume == "none":
-        model = HomographyModel(hparams=args)
+        hmodel = HomographyModel(hparams=args)
         best = 0
         print("None:train from none.")
     elif args.resume is not "":
-        model = HomographyModel(hparams=args)
+        hmodel = HomographyModel(hparams=args)
         model_old = torch.load(args.resume, map_location=lambda storage, loc: storage)
         # print(model_old.keys())
         # net.load_state_dict(torch.load('path/params.pkl'))
-        model.load_state_dict(model_old['state_dict'])
+        hmodel.load_state_dict(model_old['state_dict'])
         best = model_old['loss']
         # model = HomographyModel.load_from_checkpoint(args.resume)
         print(args.resume)
         print("model loaded.")
     else:
         try:
-            model_dir = 'lightning_logs/version*'
+            model_dir = 'HESIC_logs/version*'
             model_dir_list = sorted(glob.glob(model_dir))
             model_dir = model_dir_list[-1]
             model_path = osp.join(model_dir, "checkpoints", "*.ckpt")
             model_path_list = sorted(glob.glob(model_path))
 
             model_path = model_path_list[-1]
-            model = HomographyModel.load_from_checkpoint(model_path)
-            best = model['loss']  # QH：不确定
+            hmodel = HomographyModel.load_from_checkpoint(model_path)
+            best = hmodel['loss']  # QH：不确定
             print(model_path)
             print("model loaded.")
         except:
-            model = HomographyModel(hparams=args)
+            hmodel = HomographyModel(hparams=args)
             best = 0
             print("train from none.")
+    print("history_best:", best)
 
     device = torch.device("cuda:"+str(args.gpus) if torch.cuda.is_available() else "cpu")
-    model.to(device)
+    hmodel = hmodel.to(device)
 
-    train_set = SyntheticDataset(model.hparams.train_path, rho=model.hparams.rho, pic_size=model.hparams.picsize,
-                                 patch_size=model.hparams.patchsize)
-    val_set = SyntheticDataset(model.hparams.valid_path, rho=model.hparams.rho, pic_size=model.hparams.picsize,
-                               patch_size=model.hparams.patchsize)
+    train_set = SyntheticDataset(hmodel.hparams.train_path, rho=hmodel.hparams.rho, pic_size=hmodel.hparams.picsize,
+                                 patch_size=hmodel.hparams.patchsize)
+    val_set = SyntheticDataset(hmodel.hparams.valid_path, rho=hmodel.hparams.rho, pic_size=hmodel.hparams.picsize,
+                               patch_size=hmodel.hparams.patchsize)
     train_loader = DataLoader(
         train_set,
         num_workers=4,
-        batch_size=model.hparams.batch_size,
+        batch_size=hmodel.hparams.batch_size,
         shuffle=True,
         collate_fn=safe_collate,
     )
     validation_loader = DataLoader(
             val_set,
             num_workers=4,
-            batch_size=model.hparams.batch_size,
+            batch_size=hmodel.hparams.batch_size,
             collate_fn=safe_collate,
         )
 
-    optimizer = torch.optim.Adam(model.model.parameters(), lr=model.hparams.learning_rate)
+    optimizer = torch.optim.Adam(hmodel.model.parameters(), lr=hmodel.hparams.learning_rate)
 
     for epoch in range(args.epochs):
         for train_step, train_batch in enumerate(train_loader):
             img_a, img_b, patch_a, patch_b, corners, gt = train_batch
-            delta = model.model(patch_a, patch_b)
+            img_a = img_a.to(device)
+            img_b = img_b.to(device)
+            patch_a = patch_a.to(device)
+            patch_b = patch_b.to(device)
+            corners = corners.to(device)
+            delta = hmodel.model(patch_a, patch_b).to(device)
             optimizer.zero_grad()
             loss = photometric_loss(delta, img_a, patch_b, corners)
             loss.backward()
             optimizer.step()
+            if train_step % 100 == 0:
+                print("train || epoch:", epoch, "  step:", train_step, "  loss:", loss.data)
 
-        vali_total_loss = []
-        for vali_step, validation_batch in enumerate(validation_loader):
-            vali_img_a, vali_img_b, vali_patch_a, vali_patch_b, vali_corners, vali_gt = validation_batch
-            vali_delta = model.model(vali_patch_a, vali_patch_b)
-            vali_loss = photometric_loss(vali_delta, vali_img_a, vali_patch_b, vali_corners)  # 问题出在这里！ 换掉patch_b
-            vali_total_loss[vali_step] = {"vali_loss": vali_loss}
+        with torch.no_grad():
+            vali_total_loss = []
+            for vali_step, validation_batch in enumerate(validation_loader):
+                vali_img_a, vali_img_b, vali_patch_a, vali_patch_b, vali_corners, vali_gt = validation_batch
+                vali_img_a = vali_img_a.to(device)
+                vali_img_b = vali_img_b.to(device)
+                vali_patch_a = vali_patch_a.to(device)
+                vali_patch_b = vali_patch_b.to(device)
+                vali_corners = vali_corners.to(device)
+                vali_delta = hmodel.model(vali_patch_a, vali_patch_b).to(device)
+                vali_loss = photometric_loss(vali_delta, vali_img_a, vali_patch_b, vali_corners)  # 问题出在这里！ 换掉patch_b
+                vali_total_loss.append({"vali_loss": vali_loss})
 
-        avg_loss = torch.stack([x["val_loss"] for x in vali_total_loss]).mean()
-        if avg_loss >= best:
-            is_best = 1
-            best = avg_loss
-        else:
-            is_best = 0
-        save_checkpoint({
-                    'state_dict': model.state_dict(),
-                    'loss': avg_loss,
-                    'optimizer': optimizer.state_dict(),
-                }, is_best)
+            avg_loss = torch.stack([x["vali_loss"] for x in vali_total_loss]).mean()
+            print("test || loss:", avg_loss.data)
+            if best == 0:
+                best = avg_loss
+                is_best = 1
+            elif avg_loss <= best:
+                is_best = 1
+                best = avg_loss
+            else:
+                is_best = 0
+            save_checkpoint({
+                        'state_dict': hmodel.state_dict(),
+                        'loss': avg_loss,
+                        'optimizer': optimizer.state_dict(),
+                    }, is_best)
+            print("present best = ", best)
+            torch.cuda.empty_cache()
 
 
 
@@ -126,8 +146,8 @@ if __name__ == "__main__":
     parser.add_argument("--gpus", type=str, default="0")
     parser.add_argument("--rho", type=int, default=45, help="amount to perturb corners")
 
-    parser.add_argument("--picsize", type=int, default=512)
-    parser.add_argument("--patchsize", type=int, default=256)
+    parser.add_argument("--picsize", type=int, default=256)
+    parser.add_argument("--patchsize", type=int, default=128)
 
     parser.add_argument(
         "--resume", type=str, help="checkpoint to resume from", default=""
