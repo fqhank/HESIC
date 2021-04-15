@@ -1,8 +1,8 @@
 # CompressAI
 
-HESIC工程项目继承自https://github.com/InterDigitalInc/CompressAI
+HESIC Project is inherited from https://github.com/InterDigitalInc/CompressAI
 
-HESIC安装方法：
+Installation：
 
 ```
 pip install -e . 
