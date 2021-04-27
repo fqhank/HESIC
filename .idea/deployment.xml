@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData">
+  <component name="PublishConfigData" serverName="207@10.134.162.162:22">
     <serverData>
       <paths name="207@10.134.162.162:22">
         <serverdata>
@@ -30,21 +30,14 @@
           </mappings>
         </serverdata>
       </paths>
-      <paths name="sharklet_remote">
+      <paths name="hyy_126">
         <serverdata>
           <mappings>
             <mapping local="$PROJECT_DIR$" web="/" />
           </mappings>
         </serverdata>
       </paths>
-      <paths name="test@45.32.60.237:5999">
-        <serverdata>
-          <mappings>
-            <mapping local="$PROJECT_DIR$" web="/" />
-          </mappings>
-        </serverdata>
-      </paths>
-      <paths name="yangwenzhe@115.236.52.126:22">
+      <paths name="hyy_221">
         <serverdata>
           <mappings>
             <mapping local="$PROJECT_DIR$" web="/" />

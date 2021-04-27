@@ -1,9 +1,4 @@
 # CompressAI
-
-HESIC工程项目继承自https://github.com/InterDigitalInc/CompressAI
-
-HESIC安装方法：
-
 ```
 pip install -e . 
 pip install opencv-contrib-python==3.4.2.17 
@@ -15,36 +10,39 @@ conda config --add channels https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/
 conda install pytorch==1.6.0 torchvision cudatoolkit=10.1
 ```
 
-## License
-
-HESIC is licensed under the Apache License, Version 2.0
-
-## Contributing
-
-We welcome feedback and contributions. Please open a GitHub issue to report
-bugs, request enhancements or if you have any questions.
-
-Before contributing, please read the CONTRIBUTING.md file.
 
 
+## test scripts:
+
+cd /ywz/mywork/
+
+```python test3real.py -d "/home/ywz/database/aftercut512"  --seed 0  --patch-size 512 512 --batch-size 1 --test-batch-size 1```
+
+or
+
+```python test3_savereal.py -d "/home/ywz/database/aftercut512"  --seed 0  --patch-size 512 512 --batch-size 1 --test-batch-size 1```
 
 
 
-## Citation
+## datasets:
 
-If you use this project, please cite the relevant publications for the
-original models and datasets, and cite this project as:
+Pan Baidu :
 
-```
-@misc --- waiting
-```
+link：https://pan.baidu.com/s/1sSbMCl-6LXPal_asBt5Giw 
+code：k8rb 
 
-## Related links
- * Tensorflow compression library by _Ballé et al._: https://github.com/tensorflow/compression
- * Range Asymmetric Numeral System code from _Fabian 'ryg' Giesen_: https://github.com/rygorous/ryg_rans
- * BPG image format by _Fabrice Bellard_: https://bellard.org/bpg
- * HEVC HM reference software: https://hevc.hhi.fraunhofer.de
- * VVC VTM reference software: https://vcgit.hhi.fraunhofer.de/jvet/VVCSoftware_VTM
- * AOM AV1 reference software: https://aomedia.googlesource.com/aom
- * Z. Cheng et al. 2020: https://github.com/ZhengxueCheng/Learned-Image-Compression-with-GMM-and-Attention
- * Kodak image dataset: http://r0k.us/graphics/kodak/
+## pretrained_models:
+
+Pan Baidu :
+
+link：https://pan.baidu.com/s/1q0_2NZ46fYOCeDDg40nUaw 
+code：qrfu 
+
+
+
+
+
+
+
+
+

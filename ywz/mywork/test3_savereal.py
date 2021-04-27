@@ -1,22 +1,14 @@
-#加入homo网络
-
-# test3.py  test2:PSNR计算后再平均-=> for 独立交叉质量增强 搭配newtrain6.py
+# test3.py  （test2:PSNR计算后再平均）-=> for 独立交叉质量增强 搭配newtrain6.py newnet9.py
 # 单gpu版  和训练代码一样，只是把训练部分注释
-#python test3real.py -d "/home/ywz/database/aftercut512"  --seed 0 --cuda 0 --patch-size 512 512 --batch-size 1 --test-batch-size 1
-#python test3.py -d "/home/ywz/database/KITTI2"  --seed 0 --cuda 0 --patch-size 320 1216 --batch-size 1 --test-batch-size 1
+#python test3_save.py -d "/home/sharklet/database/aftercut512"  --seed 0 --cuda 0 --patch-size 512 512 --batch-size 1 --test-batch-size 1
 #cpu版
-#python test3.py -d "/home/ywz/database/aftercut512"  --seed 0  --patch-size 512 512 --batch-size 1 --test-batch-size 1
-
-
-#net defination
-from newnet9 import *
-
+#python test3.py -d "/home/sharklet/database/aftercut512"  --seed 0  --patch-size 512 512 --batch-size 1 --test-batch-size 1
 import argparse
 import math
 import random
 import shutil
-import os
-import cv2
+import os,glob
+import os.path as osp
 import sys
 import torch
 import torch.optim as optim
@@ -37,6 +29,9 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 
+#net defination
+
+from newnet9 import *
 import kornia, imageio
 ###homo
 from model import Net, photometric_loss
@@ -66,6 +61,21 @@ def h_adjust(orishapea,orishapeb,resizeshapea,resizeshapeb, h): #->h_ori
     return h
 #################################################
 
+out_root_path = "out_pic2"
+if not os.path.exists(out_root_path):
+    print("not ex")
+    os.system("mkdir "+out_root_path)
+left_save_path = osp.join(out_root_path,"left")
+right_save_path = osp.join(out_root_path,"right")
+if not os.path.exists(left_save_path):
+    os.system("mkdir " + left_save_path)
+if not os.path.exists(right_save_path):
+    os.system("mkdir " + right_save_path)
+
+#file
+out_root_path_file = open(osp.join(out_root_path,"details3.txt"),'w')
+
+
 def mse2psnr(mse):
     # 根据Hyper论文中的内容，将MSE->psnr(db)
     # return 10*math.log10(255*255/mse)
@@ -87,39 +97,29 @@ class RateDistortionLoss(nn.Module):
         self.mse = nn.MSELoss()
         self.lmbda = lmbda
 
-    def forward(self, output, target1,target2,kind=0):
+    def forward(self, output, target1,target2,need_bpp=False):
         N, _, H, W = target1.size()
         out = {}
         num_pixels = N * H * W
-        if kind==0:
-            # 计算误差
-            # out['bpp_loss'] = sum(
-            #     (torch.log(likelihoods).sum() / (-math.log(2) * num_pixels))
-            #     for likelihoods in output['likelihoods'].values())
-            out['mse_loss'] = self.mse(output['x1_hat'], target1) + self.mse(output['x2_hat'], target2)        #end to end
-            # out['bpp1'] = (torch.log(output['likelihoods']['y1']).sum() / (-math.log(2) * num_pixels)) + (
-            #         torch.log(output['likelihoods']['z1']).sum() / (-math.log(2) * num_pixels))
-            # out['bpp2'] = (torch.log(output['likelihoods']['y2']).sum() / (-math.log(2) * num_pixels)) + (
-            #         torch.log(output['likelihoods']['z2']).sum() / (-math.log(2) * num_pixels))
 
-            out['loss'] = self.lmbda * 255**2 * out['mse_loss'] #+ out['bpp_loss']
-
-            out['ms_ssim1'] = ms_ssim(output['x1_hat'], target1, data_range=1, size_average=False)[0]  # (N,)
-            out['ms_ssim2'] = ms_ssim(output['x2_hat'], target2, data_range=1, size_average=False)[0]
-            out['ms_ssim'] = (out['ms_ssim1']+out['ms_ssim2'])/2
-            out['psnr1'] = mse2psnr(self.mse(output['x1_hat'], target1))
-            out['psnr2'] = mse2psnr(self.mse(output['x2_hat'], target2))
-
-        else:
-            # 计算误差
-            out['bpp_loss'] = sum(
-                (torch.log(likelihoods).sum() / (-math.log(2) * num_pixels))
-                for likelihoods in output['likelihoods'].values())
-            # out['mse_loss'] = self.mse(output['x1_hat'], target1) + self.mse(output['x2_hat'], target2)  # end to end
+        # 计算误差
+        # out['bpp_loss'] = sum(
+        #     (torch.log(likelihoods).sum() / (-math.log(2) * num_pixels))
+        #     for likelihoods in output['likelihoods'].values())
+        out['mse_loss'] = self.mse(output['x1_hat'], target1) + self.mse(output['x2_hat'], target2)        #end to end
+        if need_bpp:
             out['bpp1'] = (torch.log(output['likelihoods']['y1']).sum() / (-math.log(2) * num_pixels)) + (
                     torch.log(output['likelihoods']['z1']).sum() / (-math.log(2) * num_pixels))
             out['bpp2'] = (torch.log(output['likelihoods']['y2']).sum() / (-math.log(2) * num_pixels)) + (
                     torch.log(output['likelihoods']['z2']).sum() / (-math.log(2) * num_pixels))
+
+        out['loss'] = self.lmbda * 255**2 * out['mse_loss'] #+ out['bpp_loss']
+
+        out['ms_ssim1'] = ms_ssim(output['x1_hat'], target1, data_range=1, size_average=False)[0]  # (N,)
+        out['ms_ssim2'] = ms_ssim(output['x2_hat'], target2, data_range=1, size_average=False)[0]
+        out['ms_ssim'] = (out['ms_ssim1']+out['ms_ssim2'])/2
+        out['psnr1'] = mse2psnr(self.mse(output['x1_hat'], target1))
+        out['psnr2'] = mse2psnr(self.mse(output['x2_hat'], target2))
 
         return out
 
@@ -138,6 +138,16 @@ class AverageMeter:
         self.count += n
         self.avg = self.sum / self.count
 
+def save_pic(data,path):
+    if osp.exists(path):
+        os.system("rm "+path)
+        print("rm "+path)
+    reimage = data.cpu().clone()
+    reimage[reimage > 1.0] = 1.0
+
+    reimage = reimage.squeeze(0)
+    reimage = transforms.ToPILImage()(reimage)  # PIL格式
+    reimage.save(path)
 
 
 def test_epoch(epoch, test_dataloader,modelhomo, model,model2, criterion):
@@ -178,8 +188,7 @@ def test_epoch(epoch, test_dataloader,modelhomo, model,model2, criterion):
             homo_corners_hat = homo_corners + delta_hat
             h = kornia.get_perspective_transform(homo_corners, homo_corners_hat)
             h_matrix = torch.inverse(h)
-            h_matrix = h_adjust(d1.shape[-2], d1.shape[-1], pic_size, pic_size, h_matrix)
-
+            h_matrix = h_adjust(d1.shape[-2],d1.shape[-1],pic_size,pic_size,h_matrix)
 
             out_net = model(d1,d2,h_matrix)
 
@@ -187,12 +196,12 @@ def test_epoch(epoch, test_dataloader,modelhomo, model,model2, criterion):
             # out_net['x1_hat'] = out_net2['x1_hat']
             # out_net['x2_hat'] = out_net2['x2_hat']
 
+            out_criterion1 = criterion(out_net,d1,d2,need_bpp=True)
             out_criterion = criterion(out_net2, d1, d2)
-            #+ 计算bpp
-            bpp_out_criterion = criterion(out_net, d1, d2,kind=1)
+            # out_criterion = criterion(out_net, d1,d2)
 
             aux_loss.update(model.aux_loss())
-
+            # bpp_loss.update(out_criterion['bpp_loss'])
             loss.update(out_criterion['loss'])
             mse_loss.update(out_criterion['mse_loss'])
             ssim_loss.update(out_criterion['ms_ssim'])  # 已除2
@@ -201,17 +210,42 @@ def test_epoch(epoch, test_dataloader,modelhomo, model,model2, criterion):
 
             psnr1.update(out_criterion['psnr1'])
             psnr2.update(out_criterion['psnr2'])
+            bpp1.update(out_criterion1['bpp1'])
+            bpp2.update(out_criterion1['bpp2'])
 
-            bpp_loss.update(bpp_out_criterion['bpp_loss'])
-            bpp1.update(bpp_out_criterion['bpp1'])
-            bpp2.update(bpp_out_criterion['bpp2'])
+            ssim_val = out_criterion['ms_ssim']
+            psnr1_val = out_criterion['psnr1']
+            psnr2_val = out_criterion['psnr2']
 
+            bpp1_val = out_criterion1['bpp1']
+            bpp2_val = out_criterion1['bpp2']
+
+            print_context = (str(d[3]).split("'")[1] +
+                             f'\tPSNR (dB): {(psnr1_val + psnr2_val) / 2:.3f} |'  # 平均一张图的PSNR
+                             f'\tBPP: {(bpp1_val+bpp2_val)/2:.4f} |'
+                             f'\tMS-SSIM: {ssim_val:.4f} |'  # 已除2，相加时候便除了2
+                             f'\tPSNR1: {psnr1_val:.3f} |'
+                             f'\tPSNR2: {psnr2_val:.3f} |'
+                             f'\tBPP1: {bpp1_val:.4f} |'
+                             f'\tBPP2: {bpp2_val:.4f}\n')
+
+            out_root_path_file.write(print_context)
+            print(print_context)
+
+            ##save pic
+            save_pic(out_net2['x1_hat'], osp.join(left_save_path, str(d[3]).split("'")[1]))
+            save_pic(out_net2['x2_hat'], osp.join(right_save_path, str(d[3]).split("'")[1]))
+
+            # x1_warp = kornia.warp_perspective(out_net2['x1_hat'], h_matrix, (out_net2['x1_hat'].size()[-2], out_net2['x1_hat'].size()[-1]))
+            # save_pic(x1_warp, "demo_warp.png")
+            # raise ValueError("stop test warp save")
+
+            print(str(d[3]).split("'")[1])
+            ####
+    out_root_path_file.close()
     print(f'Test epoch {epoch}: Average losses:'
           f'\tTime: {time.strftime("%Y-%m-%d %H:%M:%S")} |'
           f'\tLoss: {loss.val:.3f} |'
-          f'\tBPP: {bpp_loss.val:.3f} |'
-          f'\tBPP1: {bpp1.val:.3f} |'
-          f'\tBPP2: {bpp2.val:.3f} |'
           f'\tMSE loss: {mse_loss.val:.4f} |'
           f'\tPSNR (dB): {(psnr1.val+psnr2.val)/2:.3f} |'  #平均一张图的PSNR
           f'\tMS-SSIM: {ssim_loss.val:.4f} |'  #已除2，相加时候便除了2
@@ -328,11 +362,13 @@ def main(argv):
     train_dataset = ImageFolder(args.dataset,
                                 split='train',
                                 patch_size=args.patch_size,
-                                transform=train_transforms)
+                                transform=train_transforms,
+                                need_file_name = True)
     test_dataset = ImageFolder(args.dataset,
                                split='test',
                                patch_size=args.patch_size,
-                               transform=test_transforms)
+                               transform=test_transforms,
+                                need_file_name = True)
 
     train_dataloader = DataLoader(train_dataset,
                                   batch_size=args.batch_size,
@@ -401,12 +437,12 @@ def main(argv):
     net = net.to(device)
     net2 = net2.to(device)
 
-
     print("lambda:", args.lmbda)
     criterion = RateDistortionLoss(lmbda=args.lmbda)
 
     for epoch in [0]:  # 只跑一次
-        loss = test_epoch(epoch, test_dataloader,nethomo, net, net2, criterion)
+        loss = test_epoch(epoch, test_dataloader, nethomo, net, net2, criterion)
+
 
 if __name__ == '__main__':
     main(sys.argv[1:])
