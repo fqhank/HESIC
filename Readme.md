@@ -1,12 +1,8 @@
 # CompressAI
-<<<<<<< HEAD
-=======
-
 HESIC Project is inherited from https://github.com/InterDigitalInc/CompressAI
 
 Installation：
 
->>>>>>> 82a6454c0d296429a2762099d022a700a9b8987d
 ```
 pip install -e . 
 pip install opencv-contrib-python==3.4.2.17 
